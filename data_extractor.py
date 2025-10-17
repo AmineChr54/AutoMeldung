@@ -15,7 +15,3 @@ def create_dataframe_from_excel_table(excel_file):
 
 
 create_dataframe_from_excel_table("./tables/Krankmeldungsliste.xlsx")
-Index = ['nachname', 'vorname', 'von', 'bis', 'summe_der_tage',
-       'summe_der_tage_ohne_we', 'von_wochentag', 'bis_wochentag', 'au', 'eau',
-       'inkorrektgemeldet', 'bemerkung', 'au_file_id', 'zeitraumohne_au',
-       'zeitraummit_au']
