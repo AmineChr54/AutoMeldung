@@ -1,5 +1,3 @@
-# this file extracts data from excel table
-
 import pandas as pd
 
 def create_dataframe_from_excel_table(excel_file):
@@ -12,6 +10,3 @@ def create_dataframe_from_excel_table(excel_file):
                   .str.replace('[^a-zA-Z0-9_]', '', regex=True)  # Remove special characters
                   )
     return df
-
-
-create_dataframe_from_excel_table("./tables/Krankmeldungsliste.xlsx")

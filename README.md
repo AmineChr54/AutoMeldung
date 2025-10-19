@@ -1,148 +1,106 @@
-# PDF Automation - Automeldung
+Automeldung — PDF Automation
+============================
 
-A Python-based automation tool for generating sick leave notifications (Krankmeldungen) by extracting data from Excel files and filling PDF forms automatically.
+Automeldung creates filled PDFs for Krankmeldungen and Gesundmeldungen from an Excel table, optionally merging an AU attachment. It includes a simple Flet-based GUI and a backend pipeline that handles form filling, merging, and flattening.
 
-## 🚀 Features
+Features
+--------
+- Read data from an Excel Krankmeldungsliste and optional Kontaktdaten.
+- Generate two kinds of forms:
+	- Krankmeldung (Ohne AU / Mit AU)
+	- Gesundmeldung
+- Merge Krank + optional AU + Gesund into a single PDF per row.
+- Convert AU images (e.g., JPG/PNG/WebP) to A4 PDF automatically.
+- Flatten final PDFs so filled values are printed correctly and fields are removed.
+- GUI with file/folder pickers, sheet name inputs, row limit, collapsible sections, and a scrolling status log.
+- Settings persist to app_settings.json and are auto-loaded by the backend (no code changes needed).
 
-- **Excel Data Extraction**: Read and process sick leave data from Excel spreadsheets
-- **PDF Form Filling**: Automatically fill PDF notification forms with extracted data
-- **Column Name Cleaning**: Automatically clean Excel column names for easier programming
-- **Date Processing**: Smart date parsing and calculation for leave periods
-- **Batch Processing**: Process multiple entries at once
-- **Flexible Templates**: Support for different types of sick leave forms
+Project structure (high level)
+------------------------------
+- `gui/app.py` — Flet desktop UI.
+- `automeldung/main_exporter.py` — Orchestrates row processing and PDF creation.
+- `automeldung/config.py` — Central configuration and settings loader; also exposes a simple logger for the GUI.
+- `automeldung/utils/` — Implementation details for data, PDF merging/flattening, and image conversion.
+- `templates/` — PDF templates (Krankmeldung ohne/mit AU, Gesundmeldung).
+- `tables/` — Example Excel files.
+- `au_files/` — AU attachments (images or PDFs).
+- `export/` — Output PDFs.
 
-## 📋 Requirements
+Requirements
+------------
+- Python 3.10+ recommended
+- Dependencies listed in `requirements.txt` (pandas, openpyxl, pikepdf, reportlab, PyPDF2, flet)
 
-- Python 3.7+
-- Required packages listed in `requirements.txt`
+Setup
+-----
+1. Create a virtual environment and install dependencies:
+	 - Windows (PowerShell):
+		 - `python -m venv .venv`
+		 - `.venv\\Scripts\\Activate` (or use VS Code Python interpreter picker)
+		 - `pip install -r requirements.txt`
+2. Ensure your templates and data exist (see Configuration below).
 
-## 🛠️ Installation
+Run the GUI
+-----------
+- From the project root:
+	- `python gui/app.py`
 
-1. Clone this repository:
-```bash
-git clone https://github.com/AmineChr54/pdf-automation.git
-cd pdf-automation
-```
+What the GUI provides:
+- Input Files section (collapsible):
+	- Krankmeldungen (.xlsx) + Sheet Name
+	- Kontaktdaten (.xlsx) + Sheet Name
+	- Krankmeldung templates (Ohne AU, Mit AU) and Gesundmeldung template
+	- AU Files folder
+- Export Options (collapsible):
+	- Export folder
+	- Limit rows (processes only the first N rows)
+- Status panel: shows live logs from the backend.
 
-2. Create a virtual environment:
-```bash
-python -m venv .venv
-```
+Run from CLI (optional)
+-----------------------
+You can also run the exporter directly without the GUI:
 
-3. Activate the virtual environment:
-```bash
-# Windows
-.venv\Scripts\activate
+- `python -c "from automeldung.main_exporter import main_exporter as run; run()"`
 
-# macOS/Linux
-source .venv/bin/activate
-```
+Note: The backend reads `app_settings.json` automatically via `automeldung.config`, so any paths you picked in the GUI are used by the CLI too. If a setting is missing, config defaults are used.
 
-4. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+Configuration
+-------------
+Defaults live in `automeldung/config.py`. When present, `app_settings.json` overrides these at import time. Relevant keys:
+- `krankmeldungen_path` → `config.krankmeldungsliste_path`
+- `krankmeldungen_sheet_name` → `config.krankmeldungsliste_sheet_name`
+- `kontaktdaten_path` → `config.kontaktdaten_path`
+- `kontaktdaten_sheet_name` → `config.kontaktdaten_sheet_name`
+- `krank_ohne_path` → `config.vorlage_krankmeldung_ohne_au_path`
+- `krank_mit_path` → `config.vorlage_krankmeldung_mit_au_path`
+- `gesund_path` → `config.vorlage_gesundmeldung_path`
+- `au_folder` → `config.au_files_path`
+- `export_folder` → `config.export_path`
+- `limit_rows` → `config.limit_rows` (default 20)
 
-## 📁 Project Structure
+Settings persistence
+--------------------
+- The GUI stores selections in `app_settings.json` in the project root.
+- The backend loads and applies these settings automatically when `automeldung.config` is imported.
+- You can delete `app_settings.json` to reset saved values.
 
-```
-├── data_extractor.py          # Excel data extraction and processing
-├── pdf_creator.py             # PDF form filling and generation
-├── main_exporter.py           # Main execution script
-├── requirements.txt           # Python dependencies
-├── templates/                 # PDF templates and field mappings
-│   ├── pdf_template.pdf
-│   └── fields.txt
-└── export/                    # Generated PDF outputs (gitignored)
-```
+How it works (brief)
+--------------------
+1. Read rows from the Excel Krankmeldungsliste (sheet name selectable in UI).
+2. For each selected row:
+	 - If `summe_der_tage` ≤ 3: create Krankmeldung Ohne AU + Gesundmeldung.
+	 - Else: create Krankmeldung Mit AU (+ optional AU attachment) + Gesundmeldung.
+3. Merge PDFs (Krank + optional AU + Gesund) and flatten to final output.
 
-## 🔧 Usage
+Packaging the GUI (optional)
+----------------------------
+You can build a desktop executable with Flet’s pack command:
+- From `gui/`: `flet pack app.py`
+The output bundle will be created in a `dist/` folder.
 
-### Basic Usage
-
-1. **Prepare your data**: Place your Excel files with sick leave data in the `tables/` directory
-2. **Configure templates**: Ensure PDF templates are in the `templates/` directory
-3. **Run the automation**:
-
-```python
-from data_extractor import create_dataframe_from_excel_table
-from pdf_creator import create_pdf_form_ohne_AU
-
-# Extract data from Excel
-df = create_dataframe_from_excel_table("./tables/Krankmeldungsliste.xlsx")
-
-# Process each row to generate PDFs
-for index, row in df.iterrows():
-    create_pdf_form_ohne_AU(row)
-```
-
-### Data Extraction
-
-The `data_extractor.py` module automatically:
-- Cleans column names (removes spaces, converts to lowercase)
-- Handles special characters in column headers
-- Returns a processed pandas DataFrame
-
-### PDF Generation
-
-The `pdf_creator.py` module:
-- Reads Excel data for contact information and sick leave periods
-- Calculates relevant dates (return date, last working day, etc.)
-- Fills PDF form fields automatically
-- Generates uniquely named output files
-
-## 📊 Expected Data Format
-
-Your Excel files should contain columns for:
-- `nachname` (Last name)
-- `vorname` (First name)
-- `von` (From date - format: DD.MM.YYYY)
-- `bis` (To date - format: DD.MM.YYYY)
-
-Contact data should include:
-- `Name` (Last name)
-- `Vorname` (First name)
-- `PNr` (Personnel number)
-
-## 🎯 Features in Development
-
-- [ ] Support for electronic sick leave certificates (eAU)
-- [ ] Enhanced error handling and validation
-- [ ] GUI interface for non-technical users
-- [ ] Email integration for automatic sending
-- [ ] Bulk processing with progress tracking
-
-## ⚠️ Important Notes
-
-- This tool is designed for German sick leave processes
-- Ensure compliance with your organization's data protection policies
-- Test thoroughly with sample data before production use
-- Keep sensitive data files local (they are excluded from version control)
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🔒 Privacy & Security
-
-This project handles potentially sensitive employee data. Please ensure:
-- Data files are kept secure and not shared inappropriately
-- Compliance with GDPR and local data protection laws
-- Regular security updates of dependencies
-- Proper access controls on generated files
-
-## 📞 Support
-
-If you encounter any issues or have questions, please open an issue on GitHub.
-
----
-
-**Note**: This tool is designed for internal organizational use. Ensure proper authorization before processing employee data.
+Troubleshooting
+---------------
+- No output PDFs: verify template paths and the export folder in the GUI.
+- Missing Excel columns: ensure your Excel file matches expected column names (see `INDEX_KM`/`INDEX_KD` in `config.py`).
+- AU not found: filenames in `au_files/` should start with the `au_file_id` (case-insensitive). Images will be converted to PDF automatically.
+- Blue highlight in forms: final PDFs are flattened to remove form fields and appearance issues.
