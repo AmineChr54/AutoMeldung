@@ -140,3 +140,65 @@ class Meldung:
 
         wb.close()
         return color_info
+    
+    @staticmethod
+    def check_info_validity(row) -> Tuple[bool, str]:
+        def _is_empty(val) -> bool:
+            if val is None:
+                return True
+            try:
+                if pd.isna(val):
+                    return True
+            except Exception:
+                pass
+            if isinstance(val, str) and val.strip() == "":
+                return True
+            return False
+
+        # Consider the row empty if all key fields are empty
+        key_fields = [
+            "nachname", "vorname", "von", "bis", "au_file_id",
+        ]
+        if all(_is_empty(getattr(row, f, None)) for f in key_fields):
+            return False, "Line is empty."
+
+        errors = []
+
+        nachname = getattr(row, "nachname", None)
+        vorname = getattr(row, "vorname", None)
+
+        if _is_empty(nachname):
+            errors.append("Missing 'nachname'")
+        if _is_empty(vorname):
+            errors.append("Missing 'vorname'")
+
+        # Check presence in kontaktdaten if names provided
+        if not errors:
+            nn = (nachname or "").strip()
+            vn = (vorname or "").strip()
+            try:
+                has_last = kontaktdaten['nachname'].eq(nn).any()
+                has_first = kontaktdaten['vorname'].eq(vn).any()
+                if not has_last:
+                    errors.append("Unknown 'nachname' in kontaktdaten")
+                if not has_first:
+                    errors.append("Unknown 'vorname' in kontaktdaten")
+                if has_last and has_first:
+                    pair_exists = ((kontaktdaten['nachname'] == nn) & (kontaktdaten['vorname'] == vn)).any()
+                    if not pair_exists:
+                        errors.append("Name combination not found in kontaktdaten")
+            except Exception:
+                # If kontaktdaten is unavailable or columns missing, mark as error
+                errors.append("kontaktdaten lookup failed")
+
+        au_flag = bool(getattr(row, "au", False))
+        au_file_id = getattr(row, "au_file_id", None)
+        if au_flag and _is_empty(au_file_id):
+            errors.append("'au' is true but 'au_file_id' is empty")
+
+        if errors:
+            # Provide a short context with name if available
+            name_ctx = ", ".join([s for s in [(nachname or "").strip(), (vorname or "").strip()] if s]) or "Unknown"
+            return False, f"error: {name_ctx}: " + "; ".join(errors)
+
+        return True, ""

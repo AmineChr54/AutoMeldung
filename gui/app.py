@@ -239,9 +239,25 @@ def main(page: ft.Page):
     prog = ft.ProgressBar(width=400, visible=False)
 
     def append_log(msg: str):
-        log_view.controls.append(ft.Text(msg))
+        # Colorize based on simple keywords
+        m = str(msg)
+        ml = m.lower()
+        color = None
+        if any(k in ml for k in ("error", "fehler", "exception", "traceback")):
+            color = ft.Colors.RED_400
+        elif any(k in ml for k in ("warn", "achtung")):
+            color = ft.Colors.AMBER_400
+        elif any(k in ml for k in ("finished", "success", "done", "fertig")):
+            color = ft.Colors.GREEN_400
+        elif any(k in ml for k in ("started", "starting", "start")):
+            color = ft.Colors.BLUE_300
+        else:
+            color = ft.Colors.GREY
+
+        log_view.controls.append(ft.Text(m, color=color))
         log_view.update()
-        status_bar.value = msg
+        status_bar.value = m
+        status_bar.color = color
         status_bar.update()
 
     # --- Backend wiring (non-invasive) ---

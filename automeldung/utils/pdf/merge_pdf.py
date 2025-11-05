@@ -2,6 +2,7 @@ import os
 from typing import Optional
 import pikepdf
 from automeldung.utils.image.image_converter import image_to_pdf_a4
+import automeldung.config as config
 
 
 def merge_pdfs(paths: list[str], output_path: str) -> str:
@@ -59,6 +60,6 @@ def ensure_pdf_for_merge(path: str) -> Optional[str]:
         return path
     if ext in [".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".gif"]:
         base = os.path.splitext(os.path.basename(path))[0]
-        out_pdf = os.path.join("./export", f"{base}_as_pdf.pdf")
+        out_pdf = os.path.join(f"{config.export_path}/{base}_as_pdf.pdf")
         return image_to_pdf_a4(path, out_pdf)
     return None
