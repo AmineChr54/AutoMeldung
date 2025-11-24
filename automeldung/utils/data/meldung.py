@@ -179,6 +179,11 @@ class Meldung:
             try:
                 has_last = kontaktdaten['nachname'].eq(nn).any()
                 has_first = kontaktdaten['vorname'].eq(vn).any()
+                print("waaa")
+                vertrag_in_fachbereich = kontaktdaten.loc[(kontaktdaten['vorname'].str.startswith(vorname) & kontaktdaten['nachname'].str.startswith(nachname)),"vertrag_im"].eq('FB').item()
+                print("waaaaaa ", vertrag_in_fachbereich)
+                if vertrag_in_fachbereich:
+                    errors.append("Vertrag im Fachbereich, Meldung wird nicht erstellt.")
                 if not has_last:
                     errors.append("Unknown 'nachname' in kontaktdaten")
                 if not has_first:
@@ -187,14 +192,15 @@ class Meldung:
                     pair_exists = ((kontaktdaten['nachname'] == nn) & (kontaktdaten['vorname'] == vn)).any()
                     if not pair_exists:
                         errors.append("Name combination not found in kontaktdaten")
-            except Exception:
+            except Exception as e:
                 # If kontaktdaten is unavailable or columns missing, mark as error
-                errors.append("kontaktdaten lookup failed")
+                errors.append(f"kontaktdaten lookup failed with error {e}")
 
         au_flag = bool(getattr(row, "au", False))
         au_file_id = getattr(row, "au_file_id", None)
         if au_flag and _is_empty(au_file_id):
             errors.append("'au' is true but 'au_file_id' is empty")
+
 
         if errors:
             # Provide a short context with name if available
