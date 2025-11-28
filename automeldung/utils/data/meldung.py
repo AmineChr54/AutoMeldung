@@ -10,18 +10,13 @@ kontaktdaten = create_dataframe_from_excel_table(config.kontaktdaten_path)
 class Meldung:  
     def __init__(self, row):
         # Resolve the Excel fill color of the Nachname cell for this person
-        self.color = self.get_color(
-            xlsx_path=config.kontaktdaten_path,
-            current_cell=row.nachname,
-            sheet_name=config.krankmeldungsliste_sheet_name,
-        )
         self.nachname = row.nachname.strip()
         self.vorname = row.vorname.strip()
         self.fullname = f"{self.nachname}, {self.vorname}"
         # Parse required dates but be tolerant of missing/invalid values
         self.von_date = pd.to_datetime(row.von, format="%d.%m.%Y", errors="coerce")
         self.bis_date = pd.to_datetime(row.bis, format="%d.%m.%Y", errors="coerce")
-        # Only format when not NaT
+        # TODO else please release an error because this is crucial
         self.von_date_parsed = self.von_date.strftime("%d.%m.%Y") if pd.notna(self.von_date) else ""
         self.bis_date_parsed = self.bis_date.strftime("%d.%m.%Y") if pd.notna(self.bis_date) else ""
         self.wiederaufnahme_date = (
@@ -42,24 +37,18 @@ class Meldung:
         self.au_von = pd.to_datetime(getattr(row, "au_von", None), format="%d.%m.%Y", errors="coerce")
         self.au_bis = pd.to_datetime(getattr(row, "au_bis", None), format="%d.%m.%Y", errors="coerce")
         # Only strftime when the value is a valid Timestamp (not NaT)
-        self.au_von_parsed = self.au_von.strftime("%d.%m.%Y") if pd.notna(self.au_von) else ""
-        self.au_bis_parsed = self.au_bis.strftime("%d.%m.%Y") if pd.notna(self.au_bis) else ""
+        self.au_von_parsed = self.au_von.strftime("%d.%m.%Y") if pd.notna(self.au_von) else self.von_date_parsed
+        self.au_bis_parsed = self.au_bis.strftime("%d.%m.%Y") if pd.notna(self.au_bis) else self.bis_date_parsed
+
         # Compute ohne ranges only when AU start exists; otherwise fall back to original dates
         if pd.notna(self.au_von):
-            # If von_date is NaT, equality check will be False; fall back to existing parsed strings
-            self.von_ohne_parsed = "" if (pd.notna(self.von_date) and self.von_date == self.au_von) else self.von_date_parsed
-            self.bis_ohne_parsed = (
-                ""
-                if (pd.notna(self.von_date) and self.von_date == self.au_von)
-                else (self.au_von - pd.Timedelta(days=1)).strftime("%d.%m.%Y")
-            )
+            self.von_ohne_parsed = "" if (self.von_date_parsed == self.au_von_parsed) else self.von_date_parsed
+            self.bis_ohne_parsed = ("" if (self.von_date_parsed == self.au_von_parsed) else (self.au_von - pd.Timedelta(days=1)).strftime("%d.%m.%Y"))
         else:
-            self.von_ohne_parsed = self.von_date_parsed
+            self.von_ohne_parsed = ""
             self.bis_ohne_parsed = ""
-        self.PNr = kontaktdaten.loc[
-            (kontaktdaten['nachname'] == self.nachname) & (kontaktdaten['vorname'] == self.vorname),
-        'persnr'
-    ].values[0]
+
+        self.PNr = kontaktdaten.loc[(kontaktdaten['nachname'] == self.nachname) & (kontaktdaten['vorname'] == self.vorname),'persnr'].values[0]
 
     def get_values(self):
         return (
@@ -72,75 +61,6 @@ class Meldung:
             self.PNr
         )
 
-    @staticmethod
-    def get_color(
-        xlsx_path: str,
-        current_cell: str,
-        sheet_name: Optional[str] = None,
-    ) -> Optional[dict]:
-        """
-        Return the Excel fill color of the Nachname/Name cell for the row matching 'nachname' only.
-        Output is a dict with best-effort normalized values, e.g.:
-        {
-            'type': 'rgb',
-            'argb': 'FFFFE699',   # ARGB hex if available
-            'rgb': 'FFE699'       # RGB part if available
-        }
-        If color cannot be determined, returns None.
-        """
-        try:
-            wb = load_workbook(xlsx_path)
-        except Exception:
-            return None
-        ws = wb[sheet_name] if sheet_name and sheet_name in wb.sheetnames else wb.active
-
-        # Build header mapping from the first row
-        headers = {str(c.value).strip(): i for i, c in enumerate(ws[1], start=1) if c.value is not None}
-        name_col_idx = headers.get("Name") or headers.get("Nachname") or headers.get("nachname")
-
-        target_row_idx: Optional[int] = None
-        for r in range(2, ws.max_row + 1):
-            if ws.cell(r, name_col_idx).value == current_cell:
-                target_row_idx = r
-                break
-        if not target_row_idx:
-            wb.close()
-            return None
-
-        cell = ws.cell(target_row_idx, name_col_idx)
-        start_color = cell.fill.start_color
-
-        # Normalize color information
-        color_info: dict = {}
-        try:
-            ctype = getattr(start_color, 'type', None)
-            if ctype == 'rgb' and start_color.rgb:
-                argb = start_color.rgb  # e.g., 'FFFFE699'
-                color_info = {
-                    'type': 'rgb',
-                    'argb': argb,
-                    'rgb': argb[-6:] if len(argb) >= 6 else None,
-                }
-            elif ctype == 'indexed':
-                color_info = {
-                    'type': 'indexed',
-                    'indexed': getattr(start_color, 'indexed', None),
-                }
-            elif ctype == 'theme':
-                color_info = {
-                    'type': 'theme',
-                    'theme': getattr(start_color, 'theme', None),
-                    'tint': getattr(start_color, 'tint', None),
-                }
-            else:
-                # Unknown or no fill
-                color_info = None
-        except Exception:
-            color_info = None
-
-        wb.close()
-        return color_info
-    
     @staticmethod
     def check_info_validity(row) -> Tuple[bool, str]:
         def _is_empty(val) -> bool:
@@ -167,21 +87,19 @@ class Meldung:
         nachname = getattr(row, "nachname", None)
         vorname = getattr(row, "vorname", None)
 
+        # 1 - Nachname and Vorname check
         if _is_empty(nachname):
             errors.append("Missing 'nachname'")
         if _is_empty(vorname):
             errors.append("Missing 'vorname'")
 
-        # Check presence in kontaktdaten if names provided
         if not errors:
             nn = (nachname or "").strip()
             vn = (vorname or "").strip()
             try:
                 has_last = kontaktdaten['nachname'].eq(nn).any()
                 has_first = kontaktdaten['vorname'].eq(vn).any()
-                print("waaa")
                 vertrag_in_fachbereich = kontaktdaten.loc[(kontaktdaten['vorname'].str.startswith(vorname) & kontaktdaten['nachname'].str.startswith(nachname)),"vertrag_im"].eq('FB').item()
-                print("waaaaaa ", vertrag_in_fachbereich)
                 if vertrag_in_fachbereich:
                     errors.append("Vertrag im Fachbereich, Meldung wird nicht erstellt.")
                 if not has_last:
@@ -196,15 +114,50 @@ class Meldung:
                 # If kontaktdaten is unavailable or columns missing, mark as error
                 errors.append(f"kontaktdaten lookup failed with error {e}")
 
+        # 2 - AU aber kein AU_file
         au_flag = bool(getattr(row, "au", False))
         au_file_id = getattr(row, "au_file_id", None)
         if au_flag and _is_empty(au_file_id):
             errors.append("'au' is true but 'au_file_id' is empty")
 
+        # 3 - au_von and au_bis fields check
+        if row.eau or row.au:
+            au_von = getattr(row, "au_von", None)
+            au_bis = getattr(row, "au_bis", None)
+            if not (_is_empty(au_von) or _is_empty(au_bis)):
+                if not (row.von <= au_von <= au_bis and au_bis == row.bis):
+                    errors.append("'au_von' and 'au_bis' must be between 'von' and 'bis")
+            elif not _is_empty(au_von):
+                if not (row.von <= au_von):
+                    errors.append("'au_von' must be between 'von' and 'bis'")
+            elif not _is_empty(au_bis):
+                if not (row.von <= au_bis and au_bis == row.bis):
+                    errors.append("'au_bis' must be between 'von' and 'bis'")
 
+        # 4 - case where eau and au boxes are not checked, but need to
+        if (not (row.eau or row.au)) and Meldung.get_days_sum(row) > 3:
+            errors.append("days sick > 3, but eAU or AU boxes are not")
+
+
+        # Endcheck
         if errors:
             # Provide a short context with name if available
             name_ctx = ", ".join([s for s in [(nachname or "").strip(), (vorname or "").strip()] if s]) or "Unknown"
             return False, f"error: {name_ctx}: " + "; ".join(errors)
 
         return True, ""
+    
+    @staticmethod
+    def get_days_sum(row) -> int:
+        if row.summe_der_tage and row.summe_der_tage > 0:
+            return row.summe_der_tage
+        try:
+            von_date = pd.to_datetime(row.von, format="%d.%m.%Y", errors="coerce")
+            bis_date = pd.to_datetime(row.bis, format="%d.%m.%Y", errors="coerce")
+            if pd.notna(von_date) and pd.notna(bis_date):
+                delta = (bis_date - von_date).days + 1
+                return max(delta, 0)
+        except Exception:
+            pass
+        return 0
+    

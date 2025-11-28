@@ -4,9 +4,14 @@ import sys
 import json
 
 # Ensure project root is on sys.path so `import automeldung...` works when running from gui/
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if PROJECT_ROOT not in sys.path:
-    sys.path.insert(0, PROJECT_ROOT)
+if getattr(sys, 'frozen', False):
+    # Running as compiled EXE
+    PROJECT_ROOT = os.path.dirname(sys.executable)
+else:
+    # Running from source
+    PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    if PROJECT_ROOT not in sys.path:
+        sys.path.insert(0, PROJECT_ROOT)
 
 
 def main(page: ft.Page):
@@ -35,6 +40,8 @@ def main(page: ft.Page):
             pass
 
     settings = load_settings()
+    # Reset creation_date on startup so it doesn't persist
+    settings["creation_date"] = ""
 
     # ----- File/Folder pickers -----
     krankmeldungen_picker = ft.FilePicker()
@@ -194,6 +201,7 @@ def main(page: ft.Page):
 
     # ----- Options -----
     limit_rows = ft.TextField(label="Limit rows", value=str(settings.get("limit_rows", "20")), width=120, keyboard_type=ft.KeyboardType.NUMBER)
+    creation_date_input = ft.TextField(label="Creation Date (DD.MM.YYYY)", hint_text="Leave empty for today", expand=True, value=settings.get("creation_date", ""))
 
     def on_limit_change(e):
         val = limit_rows.value.strip()
@@ -202,7 +210,12 @@ def main(page: ft.Page):
         settings["limit_rows"] = int(val)
         save_settings(settings)
 
+    def on_creation_date_change(e):
+        settings["creation_date"] = creation_date_input.value
+        save_settings(settings)
+
     limit_rows.on_change = on_limit_change
+    creation_date_input.on_change = on_creation_date_change
     krankmeldungen_sheet_name.on_change = on_krankmeldungen_sheet_change
     kontaktdaten_sheet_name.on_change = on_kontaktdaten_sheet_change
 
@@ -222,6 +235,7 @@ def main(page: ft.Page):
                                 ),
                             ]),
                             ft.Row([
+                                creation_date_input,
                                 limit_rows,
                             ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                         ],
@@ -237,6 +251,9 @@ def main(page: ft.Page):
     log_view = ft.ListView(expand=True, spacing=6, auto_scroll=True)
     status_bar = ft.Text("Ready.")
     prog = ft.ProgressBar(width=400, visible=False)
+
+    # State for log grouping
+    log_state = {"current_column": None}
 
     def append_log(msg: str):
         # Colorize based on simple keywords
@@ -254,8 +271,26 @@ def main(page: ft.Page):
         else:
             color = ft.Colors.GREY
 
-        log_view.controls.append(ft.Text(m, color=color))
-        log_view.update()
+        # Determine if we need a new block
+        # "Processing:" indicates start of a new person/row
+        # "Export started..." or "Export finished." are major lifecycle events
+        is_new_block = m.startswith("Processing:") or m.startswith("Export started") or m.startswith("Export finished")
+
+        if is_new_block or log_state["current_column"] is None:
+            log_state["current_column"] = ft.Column(spacing=2)
+            container = ft.Container(
+                content=log_state["current_column"],
+                padding=10,
+                border=ft.border.all(1, color if color != ft.Colors.GREY else ft.Colors.BLUE_GREY_400),
+                border_radius=5,
+            )
+            log_view.controls.append(container)
+            log_view.update()
+
+        # Add the message line to the current block
+        log_state["current_column"].controls.append(ft.Text(m, color=color, selectable=True))
+        log_state["current_column"].update()
+
         status_bar.value = m
         status_bar.color = color
         status_bar.update()
@@ -287,6 +322,12 @@ def main(page: ft.Page):
             config.kontaktdaten_path = kontaktdaten_path.value
         if kontaktdaten_sheet_name.value.strip():
             config.kontaktdaten_sheet_name = kontaktdaten_sheet_name.value.strip()
+        
+        # Set creation date if provided
+        if creation_date_input.value.strip():
+            config.creation_date = creation_date_input.value.strip()
+        else:
+            config.creation_date = None
 
         # Limit rows (best-effort; the exporter currently uses head(20))
         try:
@@ -307,6 +348,7 @@ def main(page: ft.Page):
             "au_folder": au_folder.value,
             "export_folder": export_folder.value,
             "limit_rows": limit,
+            "creation_date": creation_date_input.value,
         })
         save_settings(settings)
 

@@ -1,3 +1,6 @@
+# Optional creation date override (DD.MM.YYYY)
+creation_date = None
+
 # --- Load overrides from persisted app settings (if present) ---
 # This lets the backend pick up values saved by the GUI without modifying code elsewhere.
 import os
@@ -42,6 +45,7 @@ def _apply_settings(settings: Dict[str, Any]):
               "au_folder": "au_files_path",
               "export_folder": "export_path",
               "limit_rows": "limit_rows",
+              "creation_date": "creation_date",
        }
 
        for s_key, cfg_name in direct_map.items():
