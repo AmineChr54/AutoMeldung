@@ -1,4 +1,4 @@
-# Automeldung
+# AutoMeldung
 
 > Automates the generation of German sick leave (Krankmeldung) and return-to-work PDFs from Excel data. Features AU attachment merging, PDF flattening, and a modern Flet GUI.
 
