@@ -2,7 +2,7 @@
 
 > Automates the generation of German sick leave (Krankmeldung) and return-to-work PDFs from Excel data. Features AU attachment merging, PDF flattening, and a modern Flet GUI.
 
-**Automeldung** is a desktop application designed to streamline the process of creating *Krankmeldungen* (sick notes) and *Gesundmeldungen* (return-to-work notes). It reads data from an Excel sheet, fills out PDF forms, merges optional AU (*Arbeitsunf‰higkeitsbescheinigung*) attachments, and flattens the final documents for distribution.
+**Automeldung** is a desktop application designed to streamline the process of creating *Krankmeldungen* (sick notes) and *Gesundmeldungen* (return-to-work notes). It reads data from an Excel sheet, fills out PDF forms, merges optional AU (*Arbeitsunf√§higkeitsbescheinigung*) attachments, and flattens the final documents for distribution.
 
 ## Features
 - **Excel Integration**: Reads data from a *Krankmeldungsliste* and optional *Kontaktdaten* file.
@@ -21,7 +21,7 @@ You can download the latest standalone executable for Windows from the [Releases
 
 ### Run from Source
 1. **Clone the repository:**
-   `ash
+   `bash
    git clone https://github.com/AmineChr54/pdf-automation.git
    cd pdf-automation
    ` 
@@ -33,12 +33,12 @@ You can download the latest standalone executable for Windows from the [Releases
    ` 
 
 3. **Install dependencies:**
-   `ash
+   `bash
    pip install -r requirements.txt
    ` 
 
 4. **Run the application:**
-   `ash
+   `bash
    python gui/app.py
    ` 
 
@@ -56,11 +56,11 @@ You can download the latest standalone executable for Windows from the [Releases
 4. **Run**: Click "Start Export" and watch the status log for progress.
 
 ## Project Structure
-- gui/app.py: Main entry point for the Flet GUI.
-- utomeldung/main_exporter.py: Core logic for processing rows and generating PDFs.
-- utomeldung/config.py: Configuration management.
-- utomeldung/utils/: Helper modules for data extraction, PDF manipulation, and image conversion.
-- 	emplates/: Directory for PDF form templates.
+- `gui/app.py`: Main entry point for the Flet GUI.
+- `automeldung/main_exporter.py`: Core logic for processing rows and generating PDFs.
+- `automeldung/config.py`: Configuration management.
+- `automeldung/utils/`: Helper modules for data extraction, PDF manipulation, and image conversion.
+- `templates/`: Directory for PDF form templates.
 
 ## Building the Executable
 To build a standalone .exe file using PyInstaller (via Flet):
@@ -73,4 +73,4 @@ The output will be located in the dist/ folder.
 ## Troubleshooting
 - **No output PDFs**: Verify that your template paths are correct and the export folder is writable.
 - **Missing Excel columns**: Ensure your Excel headers match the expected names (e.g., Nachname, Vorname, Von, Bis).
-- **AU not found**: Ensure AU filenames start with the corresponding u_file_id from your Excel sheet.
+- **AU not found**: Ensure AU filenames start with the corresponding `au_file_id` from your Excel sheet.
