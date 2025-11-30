@@ -1,16 +1,30 @@
 import flet as ft
-import urllib.request
-import json
+import os
+import sys
+import logging
+import shutil
 import threading
 import time
+import subprocess
+from tufup.client import Client
+import update_config
 
-def create_update_banner(page: ft.Page, current_version: str, update_url: str):
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def create_update_banner(page: ft.Page, current_version: str, version_url: str):
     """
     Creates an update banner and returns it along with a function to start the update check.
+    Uses tufup for secure updates.
     """
     update_info_text = ft.Text("A new version is available!", size=14)
+    
+    # Progress bar for download
+    progress_bar = ft.ProgressBar(width=200, visible=False)
+    
     update_action_button = ft.ElevatedButton(
-        "Download", 
+        "Update Now", 
         style=ft.ButtonStyle(color=ft.Colors.WHITE, bgcolor=ft.Colors.BLUE_600)
     )
     
@@ -20,7 +34,8 @@ def create_update_banner(page: ft.Page, current_version: str, update_url: str):
                 ft.Icon(ft.Icons.NEW_RELEASES, color=ft.Colors.AMBER),
                 ft.Column([
                     ft.Text("Update Available", weight=ft.FontWeight.BOLD),
-                    update_info_text
+                    update_info_text,
+                    progress_bar
                 ], spacing=2),
             ]),
             update_action_button
@@ -33,35 +48,148 @@ def create_update_banner(page: ft.Page, current_version: str, update_url: str):
         margin=ft.margin.only(bottom=10)
     )
 
-    def check_loop():
-        time.sleep(0.5) # Give the UI a moment to render
-        try:
-            # 1. Fetch the JSON from the cloud
-            # Add a User-Agent just in case the server requires it
-            req = urllib.request.Request(update_url, headers={'User-Agent': 'Mozilla/5.0'})
-            with urllib.request.urlopen(req, timeout=5) as url:
-                data = json.loads(url.read().decode())
-            
-            remote_version = data.get("version", "0.0.0")
-            download_url = data.get("download_url", "")
+    # --- Tufup Configuration ---
+    APP_NAME = "AutoMeldung"
+    # Use a local directory for metadata cache
+    if getattr(sys, 'frozen', False):
+        # Running as compiled EXE
+        app_install_dir = os.path.dirname(sys.executable)
+        # Store metadata in user data directory to avoid permission issues in Program Files
+        metadata_dir = os.path.join(os.getenv('LOCALAPPDATA'), APP_NAME, 'metadata')
+    else:
+        # Running from source
+        app_install_dir = os.path.dirname(os.path.abspath(__file__))
+        metadata_dir = os.path.join(app_install_dir, 'metadata_cache')
 
-            # 2. Compare versions
-            if remote_version > current_version:
-                print(f"Update found: v{remote_version}")
+    # Ensure metadata dir exists
+    os.makedirs(metadata_dir, exist_ok=True)
+
+    # URL for the TUF repository
+    # update_config.UPDATE_URL should point to the folder containing 'metadata' and 'targets'
+    METADATA_BASE_URL = f"{update_config.UPDATE_URL.rstrip('/')}/metadata/"
+    TARGET_BASE_URL = f"{update_config.UPDATE_URL.rstrip('/')}/targets/"
+
+    def get_tuf_client():
+        # Ensure root.json exists in metadata_dir
+        # In a real scenario, the initial root.json should be bundled with the app.
+        # We look for it in the app's resources.
+        root_json_path = os.path.join(metadata_dir, 'root.json')
+        
+        if not os.path.exists(root_json_path):
+            # Try to find bundled root.json
+            bundled_root = None
+            if getattr(sys, 'frozen', False):
+                # Look in sys._MEIPASS
+                bundled_root = os.path.join(sys._MEIPASS, 'metadata', 'root.json')
+            else:
+                # Look in project root/tuf_repo/metadata/root.json (dev mode)
+                # Or deploy/metadata/root.json
+                # For now, let's assume it's in the current directory or we fail gracefully
+                pass
+            
+            if bundled_root and os.path.exists(bundled_root):
+                shutil.copy(bundled_root, root_json_path)
+            else:
+                logger.warning("No bundled root.json found. Update check might fail if not initialized.")
+
+        return Client(
+            app_name=APP_NAME,
+            app_install_dir=app_install_dir,
+            current_version=current_version,
+            metadata_dir=metadata_dir,
+            metadata_base_url=METADATA_BASE_URL,
+            target_dir=app_install_dir,
+            target_base_url=TARGET_BASE_URL,
+        )
+
+    def perform_update(e):
+        if not getattr(sys, 'frozen', False):
+            page.launch_url(update_config.UPDATE_URL)
+            return
+
+        try:
+            update_action_button.disabled = True
+            update_action_button.content = ft.Row(
+                [
+                    ft.ProgressRing(width=16, height=16, stroke_width=2, color=ft.Colors.WHITE),
+                    ft.Text("Updating...", color=ft.Colors.WHITE),
+                ],
+                alignment=ft.MainAxisAlignment.CENTER,
+            )
+            progress_bar.visible = True
+            page.update()
+
+            client = get_tuf_client()
+            
+            # Download and install update
+            # tufup handles the secure download and verification
+            client.download_and_apply_update(
+                progress_hook=lambda bytes_downloaded, total_bytes: report_progress(bytes_downloaded, total_bytes)
+            )
+
+            update_action_button.content = ft.Row(
+                [
+                    ft.ProgressRing(width=16, height=16, stroke_width=2, color=ft.Colors.WHITE),
+                    ft.Text("Restarting...", color=ft.Colors.WHITE),
+                ],
+                alignment=ft.MainAxisAlignment.CENTER,
+            )
+            page.update()
+
+            # Restart the application
+            # Tufup has moved the old exe to .old and the new one is in place.
+            # We just need to restart.
+            restart_app()
+
+        except Exception as ex:
+            logger.error(f"Update failed: {ex}")
+            update_action_button.disabled = False
+            update_action_button.content = None
+            update_action_button.text = "Retry Update"
+            progress_bar.visible = False
+            page.snack_bar = ft.SnackBar(ft.Text(f"Update failed: {ex}"))
+            page.snack_bar.open = True
+            page.update()
+
+    def report_progress(current, total):
+        if total > 0:
+            percent = current / total
+            progress_bar.value = percent
+            page.update()
+
+    def restart_app():
+        """Restart the current application."""
+        logger.info("Restarting application...")
+        python = sys.executable
+        os.execl(python, python, *sys.argv)
+
+    def check_loop():
+        time.sleep(1) # Wait for UI
+        try:
+            client = get_tuf_client()
+            
+            # Refresh metadata from server
+            client.refresh()
+            
+            # Check for updates
+            update_info = client.check_for_updates()
+            
+            if update_info:
+                logger.info(f"Update found: {update_info}")
+                update_info_text.value = f"New version available."
                 
-                # Update banner content
-                update_info_text.value = f"Version {remote_version} is available. You have v{current_version}."
-                update_action_button.on_click = lambda e: page.launch_url(download_url)
+                update_action_button.text = "Update Now"
+                update_action_button.on_click = perform_update
                 
-                # Show banner
                 update_banner.visible = True
                 page.update()
-                print(f"Update banner shown for v{remote_version}")
             else:
-                print(f"No update needed. Remote: {remote_version}, Local: {current_version}")
+                logger.info("No updates available.")
 
         except Exception as e:
-            print(f"Update check failed: {e}")
+            logger.error(f"Update check failed: {e}")
+            # Don't show error to user in banner, just log it
+            # Unless it's a critical error, but for updates, silent fail is often better
 
     def start_check():
         threading.Thread(target=check_loop, daemon=True).start()
