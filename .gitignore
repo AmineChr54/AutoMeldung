@@ -50,3 +50,6 @@ version.json
 keystore/
 # tuf_repo/  <-- Un-commented to allow hosting updates on GitHub Pages
 .tufup-repo-config
+deploy/
+keystore/
+
