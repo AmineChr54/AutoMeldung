@@ -1,6 +1,8 @@
 import flet as ft
 import os
 import sys
+import update_config
+
 
 # Ensure project root is on sys.path so `import automeldung...` works when running from gui/
 if getattr(sys, 'frozen', False):
@@ -19,13 +21,27 @@ from gui.components.status import create_status_section
 from gui.components.update_checker import create_update_banner
 from gui.logic.runner import setup_runner
 
+def cleanup_old_executable():
+    """Removes the .old file left behind by the update process."""
+    if getattr(sys, 'frozen', False):
+        old_exe = sys.executable + ".old"
+        if os.path.exists(old_exe):
+            try:
+                os.remove(old_exe)
+                print(f"Removed old version: {old_exe}")
+            except Exception as e:
+                print(f"Could not remove old version: {e}")
+
 def main(page: ft.Page):
+    # Cleanup any old executable from a previous update
+    cleanup_old_executable()
+
     # Page setup
     page.title = "Automeldung — PDF Automation"
     
     # ----- App Versioning -----
-    CURRENT_VERSION = "1.0.0"
-    UPDATE_JSON_URL = "https://next.hessenbox.de/index.php/s/8rFFNoRQBoNZRt2/download"
+    CURRENT_VERSION = update_config.CURRENT_VERSION
+    VERSION_URL = update_config.VERSION_URL
 
     page.padding = 8
     page.window.width = 859
@@ -41,7 +57,7 @@ def main(page: ft.Page):
     inputs_card, input_refs = create_inputs_section(page, settings)
     export_card, export_refs = create_export_section(page, settings)
     status_card, status_refs = create_status_section()
-    update_banner, start_update_check = create_update_banner(page, CURRENT_VERSION, UPDATE_JSON_URL)
+    update_banner, start_update_check = create_update_banner(page, CURRENT_VERSION, VERSION_URL)
 
     # Setup logic
     setup_runner(page, settings, input_refs, export_refs, status_refs)

@@ -40,3 +40,10 @@ app_settings.json
 # Local data (do not commit)
 test_files/
 field_tools/
+
+# Version file
+update_config.py
+version.json
+
+# building
+/deploy/
