@@ -1,8 +1,5 @@
-import flet as ft
 import os
 import sys
-import update_config
-
 
 # Ensure project root is on sys.path so `import automeldung...` works when running from gui/
 if getattr(sys, 'frozen', False):
@@ -13,6 +10,9 @@ else:
     PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     if PROJECT_ROOT not in sys.path:
         sys.path.insert(0, PROJECT_ROOT)
+
+import flet as ft
+import update_config
 
 from gui.utils.settings import load_settings
 from gui.components.inputs import create_inputs_section
@@ -41,7 +41,7 @@ def main(page: ft.Page):
     
     # ----- App Versioning -----
     CURRENT_VERSION = update_config.CURRENT_VERSION
-    VERSION_URL = update_config.VERSION_URL
+    UPDATE_URL = update_config.UPDATE_URL
 
     page.padding = 8
     page.window.width = 859
@@ -57,7 +57,7 @@ def main(page: ft.Page):
     inputs_card, input_refs = create_inputs_section(page, settings)
     export_card, export_refs = create_export_section(page, settings)
     status_card, status_refs = create_status_section()
-    update_banner, start_update_check = create_update_banner(page, CURRENT_VERSION, VERSION_URL)
+    update_banner, start_update_check = create_update_banner(page, CURRENT_VERSION, UPDATE_URL)
 
     # Setup logic
     setup_runner(page, settings, input_refs, export_refs, status_refs)
