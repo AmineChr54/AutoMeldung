@@ -43,7 +43,7 @@ field_tools/
 
 # Version file
 update_config.py
-version.json
+
 
 # building
 /deploy/
