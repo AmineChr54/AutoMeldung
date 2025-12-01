@@ -83,11 +83,16 @@ def create_update_banner(page: ft.Page, current_version: str, version_url: str):
                 bundled_root = os.path.join(sys._MEIPASS, 'metadata', 'root.json')
             else:
                 # Look in project root/tuf_repo/metadata/root.json (dev mode)
-                # Or deploy/metadata/root.json
-                # For now, let's assume it's in the current directory or we fail gracefully
-                pass
+                # We are in gui/components/
+                # Project root is ../../
+                project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+                possible_root = os.path.join(project_root, 'tuf_repo', 'metadata', 'root.json')
+                if os.path.exists(possible_root):
+                    bundled_root = possible_root
+                    logger.info(f"Found dev root.json at {bundled_root}")
             
             if bundled_root and os.path.exists(bundled_root):
+                logger.info(f"Copying root.json from {bundled_root} to {root_json_path}")
                 shutil.copy(bundled_root, root_json_path)
             else:
                 logger.warning("No bundled root.json found. Update check might fail if not initialized.")
@@ -166,12 +171,15 @@ def create_update_banner(page: ft.Page, current_version: str, version_url: str):
     def check_loop():
         time.sleep(1) # Wait for UI
         try:
+            logger.info(f"Checking for updates from {METADATA_BASE_URL}")
             client = get_tuf_client()
             
             # Refresh metadata from server
-            client.refresh()
+            # logger.info("Refreshing metadata...")
+            # client.refresh()
             
             # Check for updates
+            logger.info("Checking for updates...")
             update_info = client.check_for_updates()
             
             if update_info:
@@ -184,10 +192,10 @@ def create_update_banner(page: ft.Page, current_version: str, version_url: str):
                 update_banner.visible = True
                 page.update()
             else:
-                logger.info("No updates available.")
+                logger.info(f"No updates available. Current version: {current_version}")
 
         except Exception as e:
-            logger.error(f"Update check failed: {e}")
+            logger.error(f"Update check failed: {e}", exc_info=True)
             # Don't show error to user in banner, just log it
             # Unless it's a critical error, but for updates, silent fail is often better
 
