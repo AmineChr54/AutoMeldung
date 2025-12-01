@@ -2,14 +2,27 @@
  "signatures": [
   {
    "keyid": "c67f4364e5cb35ea422b3e3a139679b06e7dac68aef99b31c50e16c23c86e1e6",
-   "sig": "1083a104aca923fce4efcf980343decc93928787664cc11f14715fefe8cc9ae245d1d755019b8b68756797dd23752ac60893b27b26c1360a6ae42c59b3969a0c"
+   "sig": "6b393f2952bdff1d1af8fa8bde3d15b274db431649f3811effd25578aa49921c0198812d34f104ea49fc129c76f69e63694078b678608438e3532007080bac06"
   }
  ],
  "signed": {
   "_type": "targets",
-  "expires": "2025-12-07T23:34:16Z",
+  "expires": "2025-12-08T11:26:35Z",
   "spec_version": "1.0.31",
-  "targets": {},
-  "version": 1
+  "targets": {
+   "AutoMeldung-0.9.3.tar.gz": {
+    "custom": {
+     "tufup": {
+      "required": false
+     },
+     "user": null
+    },
+    "hashes": {
+     "sha256": "eef5740a3b6f7f5e4be09b77bcaa499eda3381b6addc197f0f2a59020918c079"
+    },
+    "length": 54258736
+   }
+  },
+  "version": 2
  }
 }

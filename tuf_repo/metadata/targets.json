@@ -2,12 +2,12 @@
  "signatures": [
   {
    "keyid": "c67f4364e5cb35ea422b3e3a139679b06e7dac68aef99b31c50e16c23c86e1e6",
-   "sig": "6b393f2952bdff1d1af8fa8bde3d15b274db431649f3811effd25578aa49921c0198812d34f104ea49fc129c76f69e63694078b678608438e3532007080bac06"
+   "sig": "7535e4c5ce961e34e4de289bacee01a4f56de07fb82713df6ee3c0e133eb3bf4e7ecb1431d19e9c9f0396a3c8633e48d84155bcab8d690349e15cb0372f13c06"
   }
  ],
  "signed": {
   "_type": "targets",
-  "expires": "2025-12-08T11:26:35Z",
+  "expires": "2025-12-08T11:56:11Z",
   "spec_version": "1.0.31",
   "targets": {
    "AutoMeldung-0.9.3.tar.gz": {
@@ -21,8 +21,34 @@
      "sha256": "eef5740a3b6f7f5e4be09b77bcaa499eda3381b6addc197f0f2a59020918c079"
     },
     "length": 54258736
+   },
+   "AutoMeldung-0.9.4.patch": {
+    "custom": {
+     "tufup": {
+      "tar_hash": "02d6e254db6791759cd6c24b82809843bf20ca5a24b635125f9d1c1059040d9c",
+      "tar_hash_algorithm": "sha256",
+      "tar_size": 54753280
+     },
+     "user": null
+    },
+    "hashes": {
+     "sha256": "6cb2dfd768046d7dc768eefd9012caa42768bca8cd22ddbf221945c4f3384abf"
+    },
+    "length": 418817
+   },
+   "AutoMeldung-0.9.4.tar.gz": {
+    "custom": {
+     "tufup": {
+      "required": false
+     },
+     "user": null
+    },
+    "hashes": {
+     "sha256": "62cd35c5c3403f458e3397c33b67259b91878eea6b72ea185b2021f3ba178659"
+    },
+    "length": 54258657
    }
   },
-  "version": 2
+  "version": 3
  }
 }
