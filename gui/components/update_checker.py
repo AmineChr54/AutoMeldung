@@ -2,11 +2,9 @@ import flet as ft
 import os
 import sys
 import logging
-import shutil
-import threading
-import time
+import json
+import urllib.request
 import subprocess
-from tufup.client import Client
 import update_config
 
 # Setup logging
@@ -16,7 +14,7 @@ logger = logging.getLogger(__name__)
 def create_update_banner(page: ft.Page, current_version: str, version_url: str):
     """
     Creates an update banner and returns it along with a function to start the update check.
-    Uses tufup for secure updates.
+    Uses a simple "Download and Swap" mechanism.
     """
     update_info_text = ft.Text("A new version is available!", size=14)
     
@@ -48,158 +46,115 @@ def create_update_banner(page: ft.Page, current_version: str, version_url: str):
         margin=ft.margin.only(bottom=10)
     )
 
-    # --- Tufup Configuration ---
-    APP_NAME = "AutoMeldung"
-    # Use a local directory for metadata cache
-    if getattr(sys, 'frozen', False):
-        # Running as compiled EXE
-        app_install_dir = os.path.dirname(sys.executable)
-        # Store metadata in user data directory to avoid permission issues in Program Files
-        metadata_dir = os.path.join(os.getenv('LOCALAPPDATA'), APP_NAME, 'metadata')
-    else:
-        # Running from source
-        app_install_dir = os.path.dirname(os.path.abspath(__file__))
-        metadata_dir = os.path.join(app_install_dir, 'metadata_cache')
+    # State to hold the download URL found during check
+    update_state = {"download_url": None, "new_version": None}
 
-    # Ensure metadata dir exists
-    os.makedirs(metadata_dir, exist_ok=True)
-
-    # URL for the TUF repository
-    # update_config.UPDATE_URL should point to the folder containing 'metadata' and 'targets'
-    METADATA_BASE_URL = f"{update_config.UPDATE_URL.rstrip('/')}/metadata/"
-    TARGET_BASE_URL = f"{update_config.UPDATE_URL.rstrip('/')}/targets/"
-
-    def get_tuf_client():
-        # Ensure root.json exists in metadata_dir
-        # In a real scenario, the initial root.json should be bundled with the app.
-        # We look for it in the app's resources.
-        root_json_path = os.path.join(metadata_dir, 'root.json')
-        
-        if not os.path.exists(root_json_path):
-            # Try to find bundled root.json
-            bundled_root = None
-            if getattr(sys, 'frozen', False):
-                # Look in sys._MEIPASS
-                bundled_root = os.path.join(sys._MEIPASS, 'metadata', 'root.json')
-            else:
-                # Look in project root/tuf_repo/metadata/root.json (dev mode)
-                # We are in gui/components/
-                # Project root is ../../
-                project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
-                possible_root = os.path.join(project_root, 'tuf_repo', 'metadata', 'root.json')
-                if os.path.exists(possible_root):
-                    bundled_root = possible_root
-                    logger.info(f"Found dev root.json at {bundled_root}")
+    def check_for_updates():
+        """Fetches version.json from the server and compares versions."""
+        try:
+            # Construct URL for version.json
+            # Assumes UPDATE_URL points to a folder like ".../updates/"
+            base_url = update_config.UPDATE_URL.rstrip('/')
+            json_url = f"{base_url}/version.json"
             
-            if bundled_root and os.path.exists(bundled_root):
-                logger.info(f"Copying root.json from {bundled_root} to {root_json_path}")
-                shutil.copy(bundled_root, root_json_path)
-            else:
-                logger.warning("No bundled root.json found. Update check might fail if not initialized.")
+            logger.info(f"Checking for updates at: {json_url}")
+            
+            with urllib.request.urlopen(json_url, timeout=5) as response:
+                data = json.loads(response.read().decode())
+                
+            latest_version = data.get("version")
+            download_url = data.get("url")
+            
+            logger.info(f"Server version: {latest_version}, Current: {current_version}")
 
-        return Client(
-            app_name=APP_NAME,
-            app_install_dir=app_install_dir,
-            current_version=current_version,
-            metadata_dir=metadata_dir,
-            metadata_base_url=METADATA_BASE_URL,
-            target_dir=app_install_dir,
-            target_base_url=TARGET_BASE_URL,
-        )
+            if latest_version and latest_version != current_version:
+                # Simple string comparison. For robust semver, use packaging.version
+                update_state["new_version"] = latest_version
+                update_state["download_url"] = download_url
+                
+                # Update UI
+                update_info_text.value = f"Version {latest_version} is available."
+                update_action_button.text = "Update Now"
+                update_action_button.on_click = perform_update
+                update_banner.visible = True
+                page.update()
+            else:
+                logger.info("App is up to date.")
+
+        except Exception as e:
+            logger.error(f"Update check failed: {e}")
 
     def perform_update(e):
+        """Downloads the new exe and runs the batch swapper."""
+        download_url = update_state["download_url"]
+        if not download_url:
+            return
+
+        # If running from source, just open the URL
         if not getattr(sys, 'frozen', False):
-            page.launch_url(update_config.UPDATE_URL)
+            page.launch_url(download_url)
             return
 
         try:
+            # UI Feedback
             update_action_button.disabled = True
             update_action_button.content = ft.Row(
-                [
-                    ft.ProgressRing(width=16, height=16, stroke_width=2, color=ft.Colors.WHITE),
-                    ft.Text("Updating...", color=ft.Colors.WHITE),
-                ],
+                [ft.ProgressRing(width=16, height=16, stroke_width=2, color=ft.Colors.WHITE),
+                 ft.Text("Downloading...", color=ft.Colors.WHITE)],
                 alignment=ft.MainAxisAlignment.CENTER,
             )
             progress_bar.visible = True
             page.update()
 
-            client = get_tuf_client()
-            
-            # Download and install update
-            # tufup handles the secure download and verification
-            client.download_and_apply_update(
-                progress_hook=lambda bytes_downloaded, total_bytes: report_progress(bytes_downloaded, total_bytes)
-            )
+            # 1. Determine paths
+            current_exe = sys.executable
+            exe_dir = os.path.dirname(current_exe)
+            new_exe_path = os.path.join(exe_dir, "AutoMeldung.new")
+            bat_path = os.path.join(exe_dir, "update.bat")
 
-            update_action_button.content = ft.Row(
-                [
-                    ft.ProgressRing(width=16, height=16, stroke_width=2, color=ft.Colors.WHITE),
-                    ft.Text("Restarting...", color=ft.Colors.WHITE),
-                ],
-                alignment=ft.MainAxisAlignment.CENTER,
-            )
-            page.update()
+            # 2. Download the new file
+            logger.info(f"Downloading update from {download_url}...")
+            urllib.request.urlretrieve(download_url, new_exe_path, reporthook=report_progress)
 
-            # Restart the application
-            # Tufup has moved the old exe to .old and the new one is in place.
-            # We just need to restart.
-            restart_app()
+            # 3. Create Batch Script to swap files
+            # The script waits 2 seconds, deletes the old exe, renames the new one, and restarts it.
+            batch_script = f"""
+@echo off
+timeout /t 2 /nobreak > NUL
+del "{current_exe}"
+move "{new_exe_path}" "{current_exe}"
+start "" "{current_exe}"
+del "%~f0"
+"""
+            with open(bat_path, "w") as f:
+                f.write(batch_script)
+
+            # 4. Run the batch script and exit
+            logger.info("Starting update script and exiting...")
+            subprocess.Popen([bat_path], shell=True)
+            page.window_close()
+            sys.exit(0)
 
         except Exception as ex:
             logger.error(f"Update failed: {ex}")
             update_action_button.disabled = False
             update_action_button.content = None
-            update_action_button.text = "Retry Update"
+            update_action_button.text = "Retry"
             progress_bar.visible = False
             page.snack_bar = ft.SnackBar(ft.Text(f"Update failed: {ex}"))
             page.snack_bar.open = True
             page.update()
 
-    def report_progress(current, total):
-        if total > 0:
-            percent = current / total
+    def report_progress(block_num, block_size, total_size):
+        if total_size > 0:
+            percent = (block_num * block_size) / total_size
+            if percent > 1.0: percent = 1.0
             progress_bar.value = percent
             page.update()
 
-    def restart_app():
-        """Restart the current application."""
-        logger.info("Restarting application...")
-        python = sys.executable
-        os.execl(python, python, *sys.argv)
-
-    def check_loop():
-        time.sleep(1) # Wait for UI
-        try:
-            logger.info(f"Checking for updates from {METADATA_BASE_URL}")
-            client = get_tuf_client()
-            
-            # Refresh metadata from server
-            # logger.info("Refreshing metadata...")
-            # client.refresh()
-            
-            # Check for updates
-            logger.info("Checking for updates...")
-            update_info = client.check_for_updates()
-            
-            if update_info:
-                logger.info(f"Update found: {update_info}")
-                update_info_text.value = f"New version available."
-                
-                update_action_button.text = "Update Now"
-                update_action_button.on_click = perform_update
-                
-                update_banner.visible = True
-                page.update()
-            else:
-                logger.info(f"No updates available. Current version: {current_version}")
-
-        except Exception as e:
-            logger.error(f"Update check failed: {e}", exc_info=True)
-            # Don't show error to user in banner, just log it
-            # Unless it's a critical error, but for updates, silent fail is often better
-
     def start_check():
-        threading.Thread(target=check_loop, daemon=True).start()
+        # Run in a thread to not block UI
+        import threading
+        threading.Thread(target=check_for_updates, daemon=True).start()
 
     return update_banner, start_check
