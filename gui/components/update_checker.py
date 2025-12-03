@@ -22,7 +22,7 @@ def create_update_banner(page: ft.Page, current_version: str, update_url: str):
     status_text = ft.Text("", size=12, color=ft.Colors.GREY_400, italic=True)
     
     def start_update(e):
-        """Triggers the update process via Launcher.exe"""
+        """Triggers the update process via AutoMeldung.exe (launcher)"""
         update_btn.disabled = True
         update_btn.text = "Starting..."
         status_text.value = "⏳ Please close this window for the update to start."
@@ -31,7 +31,7 @@ def create_update_banner(page: ft.Page, current_version: str, update_url: str):
 
         try:
             # Determine launcher path
-            launcher_exe = "Launcher.exe"
+            launcher_exe = "AutoMeldung.exe"
             if getattr(sys, 'frozen', False):
                 base_dir = os.path.dirname(sys.executable)
                 launcher_path = os.path.join(base_dir, launcher_exe)

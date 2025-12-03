@@ -24,7 +24,9 @@ from gui.logic.runner import setup_runner
 def cleanup_old_executable():
     """Removes the .old file left behind by the update process."""
     if getattr(sys, 'frozen', False):
-        old_exe = sys.executable + ".old"
+        # In production, this file is core.exe, so look for core.exe.old
+        base_dir = os.path.dirname(sys.executable)
+        old_exe = os.path.join(base_dir, "core.exe.old")
         if os.path.exists(old_exe):
             try:
                 os.remove(old_exe)

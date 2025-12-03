@@ -52,4 +52,4 @@ keystore/
 .tufup-repo-config
 deploy/
 keystore/
-
+/updates/launcher.log
