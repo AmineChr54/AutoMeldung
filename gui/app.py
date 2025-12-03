@@ -94,4 +94,17 @@ def main(page: ft.Page):
     start_update_check()
 
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--version", action="store_true", help="Print version and exit")
+    parser.add_argument("--update-available", action="store_true", help="Signal that update is available")
+    args, unknown = parser.parse_known_args()
+
+    if args.version:
+        print(update_config.CURRENT_VERSION)
+        sys.exit(0)
+
+    if args.update_available:
+        os.environ["UPDATE_AVAILABLE"] = "1"
+
     ft.app(target=main)
