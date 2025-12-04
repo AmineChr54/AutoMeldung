@@ -54,7 +54,7 @@ FUN_FACTS = [
     "Did you know? PDFs were invented by Adobe in 1993.",
     "The average office worker uses 10,000 sheets of paper per year.",
     "Tip: You can drag and drop files directly into the app!",
-    "'Automeldung' means 'auto-report' in German.",
+    "'AutoMeldung' means 'auto-report' in German.",
     "The first PDF viewer was called Acrobat Reader.",
     "Tip: Keep your templates organized for faster exports.",
     "Digital documents save trees! 🌲",
@@ -63,8 +63,7 @@ FUN_FACTS = [
     "This app was built with Python and Flet.",
     "The PDF format is now an open ISO standard.",
     "Tip: Use descriptive filenames for easier searching.",
-    "Over 2.5 trillion PDFs are created every year.",
-    "Tip: Press Tab to navigate between fields quickly.",
+    "Over 2.5 trillion PDFs are created every year."
 ]
 
 # Update URL
@@ -80,7 +79,7 @@ if not UPDATE_URL:
 
 
 class ModernSplashScreen:
-    """A modern, sleek loading splash screen."""
+    """A modern, sleek loading splash screen with smooth edges."""
     
     def __init__(self, mode="startup"):
         self.mode = mode
@@ -92,14 +91,49 @@ class ModernSplashScreen:
         self.update_available = False
         self.progress_angle = 0
         self.dots = 0
+        self.glow_phase = 0
+        self.scale = 1.0  # Raw DPI scale factor (screen)
+        self.win_scale = 1.0  # Window element scale (clamped)
+        self.font_scale = 1.0  # Font scale (clamped, slightly lower than DPI)
+        
+    def get_dpi_scale(self):
+        """Calculate scale factor based on screen DPI."""
+        try:
+            # Get the actual DPI
+            dpi = self.root.winfo_fpixels('1i')
+            # Standard DPI is 96, scale proportionally
+            # For high-DPI displays, this will be > 1
+            scale = dpi / 96.0
+            # Clamp between 1.0 and 2.5 for reasonable scaling
+            return max(1.0, min(2.5, scale))
+        except:
+            return 1.0
+    
+    def s(self, value):
+        """Scale a value for window geometry based on clamped DPI."""
+        return int(value * self.win_scale)
+
+    def fs(self, value):
+        """Scale a font size based on clamped font DPI."""
+        return int(max(1, round(value * self.font_scale)))
         
     def create_window(self):
         """Creates the modern splash screen window."""
         self.root = tk.Tk()
         self.root.title("AutoMeldung")
         
-        # Window settings - larger for better readability
-        width, height = 480, 280
+        # Calculate DPI scale factor and derive UI scales
+        self.scale = self.get_dpi_scale()
+        # Keep window scaling reasonable; very large displays won't explode the UI
+        self.win_scale = max(1.0, min(1.6, self.scale))
+        # Fonts usually feel too large at full DPI; cap and slightly reduce
+        self.font_scale = max(1.0, min(1.25, self.scale * 0.9))
+
+        # Base dimensions (smaller and then scaled)
+        base_width, base_height = 520, 360
+        width = self.s(base_width)
+        height = self.s(base_height)
+        
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
         x = (screen_width - width) // 2
@@ -109,17 +143,23 @@ class ModernSplashScreen:
         # Remove window decorations (borderless)
         self.root.overrideredirect(True)
         
+        # Make window transparent for smooth edges
+        self.root.attributes('-transparentcolor', '#010101')
+        
         # Make window stay on top initially
         self.root.attributes('-topmost', True)
         self.root.after(100, lambda: self.root.attributes('-topmost', False))
         
-        # Modern dark theme colors
-        self.bg_color = "#0f0f1a"
+        # Modern Flet-like dark theme colors (matching your app)
+        self.bg_color = "#010101"  # Transparent color
         self.fg_color = "#ffffff"
-        self.accent_color = "#6366f1"  # Indigo
-        self.accent_light = "#818cf8"
-        self.muted_color = "#6b7280"
-        self.card_color = "#1a1a2e"
+        self.accent_color = "#7c4dff"  # Purple accent like Flet
+        self.accent_light = "#b388ff"
+        self.accent_glow = "#9c6fff"
+        self.muted_color = "#9e9e9e"
+        self.card_color = "#1e1e2e"  # Dark surface color
+        self.surface_color = "#252536"  # Slightly lighter surface
+        self.border_color = "#3d3d5c"
         
         self.root.configure(bg=self.bg_color)
         
@@ -133,67 +173,64 @@ class ModernSplashScreen:
         )
         self.canvas.pack(fill="both", expand=True)
         
-        # Draw rounded rectangle background
-        self.draw_rounded_rect(10, 10, width-10, height-10, 20, self.card_color)
+        # Draw smooth rounded rectangle with shadow effect
+        self.draw_shadow(self.s(20), self.s(20), width-self.s(20), height-self.s(20), self.s(28))
         
-        # Draw subtle border
-        self.draw_rounded_rect_outline(10, 10, width-10, height-10, 20, "#2a2a4a")
+        # Draw main card with smooth rounded corners
+        self.draw_smooth_rounded_rect(self.s(16), self.s(16), width-self.s(16), height-self.s(16), self.s(28), self.card_color)
         
-        # App icon (simple geometric shape)
-        self.draw_app_icon(width // 2, 70)
+        # Draw inner highlight for depth
+        self.draw_inner_glow(self.s(18), self.s(18), width-self.s(18), height-self.s(18), self.s(26), "#2a2a3e")
         
-        # App title
-        title_font = tkfont.Font(family="Segoe UI", size=22, weight="bold")
-        self.canvas.create_text(
-            width // 2, 120,
-            text="AutoMeldung",
-            font=title_font,
-            fill=self.fg_color
-        )
+        # Draw subtle border with gradient feel
+        self.draw_smooth_border(self.s(16), self.s(16), width-self.s(16), height-self.s(16), self.s(28), self.border_color)
         
-        # Version text
-        version_font = tkfont.Font(family="Segoe UI", size=9)
+        # App icon (modern geometric shape with glow)
+        self.draw_modern_app_icon(width // 2, self.s(92))
+        
+        # App title with modern font - scale font size (slightly smaller)
+        title_size = self.fs(22)
+        title_font = tkfont.Font(family="Segoe UI Variable", size=title_size, weight="bold")
+        # Try fallback fonts if Segoe UI Variable not available
+        try:
+            self.canvas.create_text(width // 2, self.s(176), text="AutoMeldung", font=title_font, fill=self.fg_color)
+        except:
+            title_font = tkfont.Font(family="Segoe UI", size=title_size, weight="bold")
+            self.canvas.create_text(width // 2, self.s(176), text="AutoMeldung", font=title_font, fill=self.fg_color)
+        
+        # Version badge
         try:
             version = update_config.CURRENT_VERSION
         except:
             version = "1.0.0"
-        self.canvas.create_text(
-            width // 2, 145,
-            text=f"v{version}",
-            font=version_font,
-            fill=self.muted_color
-        )
         
-        # Status text
-        status_font = tkfont.Font(family="Segoe UI", size=11)
+        # Version tag removed per request
+        
+        # Status text with modern font
+        status_size = self.fs(12)
+        status_font = tkfont.Font(family="Segoe UI", size=status_size)
         status_text = "Checking for updates" if self.mode == "startup" else "Installing update"
         self.status_text_id = self.canvas.create_text(
-            width // 2, 180,
+            width // 2, self.s(232),
             text=status_text,
             font=status_font,
             fill=self.accent_light
         )
         
-        # Loading dots animation
-        self.dots_id = self.canvas.create_text(
-            width // 2 + 80, 180,
-            text="",
-            font=status_font,
-            fill=self.accent_light,
-            anchor="w"
-        )
+        # Loading dots removed per request
         
-        # Progress bar background
-        bar_width = 300
-        bar_height = 4
+        # Modern progress bar with rounded ends
+        bar_width = self.s(360)
+        bar_height = self.s(6)
         bar_x = (width - bar_width) // 2
-        bar_y = 205
+        bar_y = self.s(266)
         
-        self.draw_rounded_rect(bar_x, bar_y, bar_x + bar_width, bar_y + bar_height, 2, "#2a2a4a")
+        # Progress bar track
+        self.draw_smooth_rounded_rect(bar_x, bar_y, bar_x + bar_width, bar_y + bar_height, self.s(4), self.surface_color)
         
-        # Progress bar fill (animated)
+        # Progress bar fill (animated) with glow
         self.progress_bar = self.canvas.create_rectangle(
-            bar_x, bar_y, bar_x + 50, bar_y + bar_height,
+            bar_x + 2, bar_y + 1, bar_x + self.s(90), bar_y + bar_height - 1,
             fill=self.accent_color, outline=""
         )
         self.bar_x = bar_x
@@ -201,122 +238,236 @@ class ModernSplashScreen:
         self.bar_y = bar_y
         self.bar_height = bar_height
         
-        # Fun fact
-        fact_font = tkfont.Font(family="Segoe UI", size=9)
+        # Fun fact (icon removed per request)
+        fact_size = self.fs(10)
+        fact_font = tkfont.Font(family="Segoe UI", size=fact_size)
         self.fact_id = self.canvas.create_text(
-            width // 2, 245,
+            width // 2, self.s(304),
             text=random.choice(FUN_FACTS),
             font=fact_font,
             fill=self.muted_color,
-            width=400
+            width=self.s(520),
+            justify="center"
         )
         
-        # Start animations
+        # Start animations (dots animation removed)
         self.animate_progress()
-        self.animate_dots()
         self.rotate_facts()
+        self.animate_glow()
         
-    def draw_rounded_rect(self, x1, y1, x2, y2, radius, color):
-        """Draws a rounded rectangle."""
-        points = [
-            x1 + radius, y1,
-            x2 - radius, y1,
-            x2, y1,
-            x2, y1 + radius,
-            x2, y2 - radius,
-            x2, y2,
-            x2 - radius, y2,
-            x1 + radius, y2,
-            x1, y2,
-            x1, y2 - radius,
-            x1, y1 + radius,
-            x1, y1,
-        ]
-        self.canvas.create_polygon(points, fill=color, smooth=True, outline="")
+    def draw_smooth_rounded_rect(self, x1, y1, x2, y2, radius, color):
+        """Draws a smooth rounded rectangle using multiple overlapping shapes."""
+        # Use create_polygon with more points for smoother corners
+        import math
+        points = []
         
-    def draw_rounded_rect_outline(self, x1, y1, x2, y2, radius, color):
-        """Draws a rounded rectangle outline."""
-        # Top
-        self.canvas.create_line(x1 + radius, y1, x2 - radius, y1, fill=color)
-        # Right
-        self.canvas.create_line(x2, y1 + radius, x2, y2 - radius, fill=color)
-        # Bottom
-        self.canvas.create_line(x1 + radius, y2, x2 - radius, y2, fill=color)
-        # Left
-        self.canvas.create_line(x1, y1 + radius, x1, y2 - radius, fill=color)
-        # Corners (arcs)
-        self.canvas.create_arc(x1, y1, x1 + 2*radius, y1 + 2*radius, start=90, extent=90, style="arc", outline=color)
-        self.canvas.create_arc(x2 - 2*radius, y1, x2, y1 + 2*radius, start=0, extent=90, style="arc", outline=color)
-        self.canvas.create_arc(x2 - 2*radius, y2 - 2*radius, x2, y2, start=270, extent=90, style="arc", outline=color)
-        self.canvas.create_arc(x1, y2 - 2*radius, x1 + 2*radius, y2, start=180, extent=90, style="arc", outline=color)
+        # Number of points for each corner arc
+        steps = 12
         
-    def draw_app_icon(self, cx, cy):
-        """Draws a modern app icon."""
-        # Outer circle (gradient effect with multiple circles)
-        for i in range(3):
-            offset = i * 2
-            color = ["#4f46e5", "#6366f1", "#818cf8"][i]
-            self.canvas.create_oval(
-                cx - 25 + offset, cy - 25 + offset,
-                cx + 25 - offset, cy + 25 - offset,
-                fill=color, outline=""
+        # Top-right corner
+        for i in range(steps + 1):
+            angle = math.pi * 1.5 + (math.pi / 2) * (i / steps)
+            px = x2 - radius + radius * math.cos(angle)
+            py = y1 + radius + radius * math.sin(angle)
+            points.extend([px, py])
+        
+        # Bottom-right corner
+        for i in range(steps + 1):
+            angle = 0 + (math.pi / 2) * (i / steps)
+            px = x2 - radius + radius * math.cos(angle)
+            py = y2 - radius + radius * math.sin(angle)
+            points.extend([px, py])
+        
+        # Bottom-left corner
+        for i in range(steps + 1):
+            angle = math.pi / 2 + (math.pi / 2) * (i / steps)
+            px = x1 + radius + radius * math.cos(angle)
+            py = y2 - radius + radius * math.sin(angle)
+            points.extend([px, py])
+        
+        # Top-left corner
+        for i in range(steps + 1):
+            angle = math.pi + (math.pi / 2) * (i / steps)
+            px = x1 + radius + radius * math.cos(angle)
+            py = y1 + radius + radius * math.sin(angle)
+            points.extend([px, py])
+        
+        self.canvas.create_polygon(points, fill=color, outline="", smooth=False)
+    
+    def draw_shadow(self, x1, y1, x2, y2, radius):
+        """Draws a soft shadow effect."""
+        # Inset shadow to avoid drawing past the card bounds
+        shadow_colors = ["#0a0a12", "#0c0c15", "#0e0e18"]
+        for i, color in enumerate(shadow_colors):
+            inset = (len(shadow_colors) - i) * 2
+            self.draw_smooth_rounded_rect(
+                x1 + inset, y1 + inset,
+                x2 - inset, y2 - inset,
+                max(0, radius - inset // 2), color
             )
+    
+    def draw_inner_glow(self, x1, y1, x2, y2, radius, color):
+        """Draws an inner highlight for depth."""
+        # Top edge highlight
+        self.draw_smooth_rounded_rect(x1, y1, x2, y1 + 2, radius, color)
+    
+    def draw_smooth_border(self, x1, y1, x2, y2, radius, color):
+        """Draws a smooth border around the rectangle."""
+        import math
+        points = []
+        steps = 14  # slightly more steps for cleaner corners
         
-        # Document icon in center
-        doc_color = "#ffffff"
-        # Document body
-        self.canvas.create_rectangle(cx - 8, cy - 12, cx + 8, cy + 12, fill=doc_color, outline="")
-        # Folded corner
-        self.canvas.create_polygon(
-            cx + 8, cy - 12,
-            cx + 8, cy - 6,
-            cx + 2, cy - 12,
-            fill="#c7d2fe", outline=""
-        )
-        # Lines on document
-        for i in range(3):
-            y = cy - 4 + i * 6
-            self.canvas.create_line(cx - 5, y, cx + 5, y, fill="#6366f1", width=1)
+        # Top-right corner
+        for i in range(steps + 1):
+            angle = math.pi * 1.5 + (math.pi / 2) * (i / steps)
+            px = x2 - radius + radius * math.cos(angle)
+            py = y1 + radius + radius * math.sin(angle)
+            points.extend([px, py])
+        
+        # Bottom-right corner
+        for i in range(steps + 1):
+            angle = 0 + (math.pi / 2) * (i / steps)
+            px = x2 - radius + radius * math.cos(angle)
+            py = y2 - radius + radius * math.sin(angle)
+            points.extend([px, py])
+        
+        # Bottom-left corner
+        for i in range(steps + 1):
+            angle = math.pi / 2 + (math.pi / 2) * (i / steps)
+            px = x1 + radius + radius * math.cos(angle)
+            py = y2 - radius + radius * math.sin(angle)
+            points.extend([px, py])
+        
+        # Top-left corner
+        for i in range(steps + 1):
+            angle = math.pi + (math.pi / 2) * (i / steps)
+            px = x1 + radius + radius * math.cos(angle)
+            py = y1 + radius + radius * math.sin(angle)
+            points.extend([px, py])
+        
+        # Draw border line with rounded caps/joints to prevent tips
+        self.canvas.create_line(points, fill=color, width=1, smooth=True, capstyle="round", joinstyle="round")
+
+    # position_dots removed (loading dots no longer used)
+    
+    def draw_pill_badge(self, cx, cy, text, bg_color, text_color):
+        """Draws a pill-shaped badge with text."""
+        font_size = int(10 * self.scale)
+        font = tkfont.Font(family="Segoe UI", size=font_size)
+        # Measure text
+        text_width = font.measure(text)
+        padding = self.s(14)
+        height = self.s(26)
+        
+        x1 = cx - text_width // 2 - padding
+        x2 = cx + text_width // 2 + padding
+        y1 = cy - height // 2
+        y2 = cy + height // 2
+        
+        self.draw_smooth_rounded_rect(x1, y1, x2, y2, height // 2, bg_color)
+        self.canvas.create_text(cx, cy, text=text, font=font, fill=text_color)
+    
+    def draw_modern_app_icon(self, cx, cy):
+        """Draws a modern, cleaner document-in-circle icon."""
+        # Outer soft glow (layered circles)
+        outer_colors = ["#3f2e84", "#4b3a98", "#5a47ae"]
+        for i, color in enumerate(outer_colors):
+            r = self.s(50 - i * 6)
+            self.canvas.create_oval(cx - r, cy - r, cx + r, cy + r, fill=color, outline="")
+
+        # Main circular badge (simulated gradient via layers)
+        badge_layers = ["#5e35b1", "#6c3fe0", "#7c4dff", "#8b66ff"]
+        for i, color in enumerate(badge_layers):
+            r = self.s(34 - i * 4)
+            self.canvas.create_oval(cx - r, cy - r, cx + r, cy + r, fill=color, outline="")
+
+        # Accent ring
+        ring_r = self.s(34)
+        self.canvas.create_oval(cx - ring_r, cy - ring_r, cx + ring_r, cy + ring_r, outline="#a78bfa", width=self.s(2))
+
+        # Document card (rounded)
+        doc_w, doc_h = self.s(28), self.s(36)
+        rx, ry = self.s(7), self.s(7)
+        x1, y1 = cx - doc_w // 2, cy - doc_h // 2
+        x2, y2 = x1 + doc_w, y1 + doc_h
+
+        # Subtle shadow behind doc
+        self.draw_smooth_rounded_rect(x1 + self.s(1), y1 + self.s(2), x2 + self.s(1), y2 + self.s(2), rx, "#d2c6f7")
+        # Document face
+        self.draw_smooth_rounded_rect(x1, y1, x2, y2, rx, "#ffffff")
+
+        # Folded corner (smaller, cleaner)
+        fold = self.s(8)
+        self.canvas.create_polygon(x2 - fold, y1, x2, y1, x2, y1 + fold, fill="#ede7f6", outline="")
+
+        # Header bullet
+        bullet_r = self.s(3)
+        bx = x1 + self.s(6)
+        by = y1 + self.s(8)
+        self.canvas.create_oval(bx - bullet_r, by - bullet_r, bx + bullet_r, by + bullet_r, fill="#7c4dff", outline="")
+
+        # Document lines (rounded ends)
+        line_color = "#7c4dff"
+        lw = max(2, self.s(2))
+        start_x = x1 + self.s(10)
+        line_lengths = [self.s(12), self.s(16), self.s(10)]
+        for i, length in enumerate(line_lengths):
+            y = y1 + self.s(12) + self.s(i * 8)
+            self.canvas.create_line(start_x, y, start_x + length, y, fill=line_color, width=lw, capstyle="round")
     
     def animate_progress(self):
-        """Animates the progress bar (back and forth)."""
+        """Animates the progress bar with smooth easing."""
         if self.should_close or not self.root:
             return
             
-        # Calculate position (oscillating)
+        # Calculate position with smooth easing
         import math
-        self.progress_angle += 0.05
-        progress = (math.sin(self.progress_angle) + 1) / 2  # 0 to 1
+        self.progress_angle += 0.03
         
-        fill_width = 80
-        x_pos = self.bar_x + progress * (self.bar_width - fill_width)
+        # Use sine wave for smooth back-and-forth motion
+        progress = (math.sin(self.progress_angle) + 1) / 2  # 0 to 1
+        # Apply easing for smoother feel
+        eased = progress * progress * (3 - 2 * progress)  # Smoothstep
+        
+        fill_width = self.s(100)  # Scaled progress bar fill width (slightly smaller)
+        x_pos = self.bar_x + 2 + eased * (self.bar_width - fill_width - 4)
         
         self.canvas.coords(
             self.progress_bar,
-            x_pos, self.bar_y,
-            x_pos + fill_width, self.bar_y + self.bar_height
+            x_pos, self.bar_y + 1,
+            x_pos + fill_width, self.bar_y + self.bar_height - 1
         )
         
         self.root.after(16, self.animate_progress)  # ~60fps
     
-    def animate_dots(self):
-        """Animates the loading dots."""
+    # animate_dots removed per request
+    
+    def animate_glow(self):
+        """Animates a subtle glow effect on the accent elements."""
         if self.should_close or not self.root:
             return
             
-        self.dots = (self.dots + 1) % 4
-        dots_text = "." * self.dots
-        self.canvas.itemconfig(self.dots_id, text=dots_text)
+        import math
+        self.glow_phase += 0.05
         
-        self.root.after(400, self.animate_dots)
+        # Pulse the progress bar color slightly
+        intensity = int(77 + 20 * math.sin(self.glow_phase))  # 77 is base for #4d in hex
+        glow_color = f"#7c{intensity:02x}ff"
+        
+        try:
+            self.canvas.itemconfig(self.progress_bar, fill=glow_color)
+        except:
+            pass
+        
+        self.root.after(50, self.animate_glow)
     
     def rotate_facts(self):
-        """Changes the fun fact periodically."""
+        """Changes the fun fact periodically with transition."""
         if self.should_close or not self.root:
             return
             
         self.canvas.itemconfig(self.fact_id, text=random.choice(FUN_FACTS))
-        self.root.after(4000, self.rotate_facts)
+        self.root.after(5000, self.rotate_facts)
     
     def set_status(self, text):
         """Updates the status text."""

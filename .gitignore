@@ -49,3 +49,4 @@ version.json
 /deploy/
 keystore/
 /updates/launcher.log
+launcher.log
