@@ -99,7 +99,13 @@ class Meldung:
             try:
                 has_last = kontaktdaten['nachname'].eq(nn).any()
                 has_first = kontaktdaten['vorname'].eq(vn).any()
-                vertrag_in_fachbereich = kontaktdaten.loc[(kontaktdaten['vorname'].str.startswith(vorname) & kontaktdaten['nachname'].str.startswith(nachname)),"vertrag_im"].eq('FB').item()
+                # Check if vertrag is in Fachbereich - handle multiple matches gracefully
+                vertrag_matches = kontaktdaten.loc[
+                    (kontaktdaten['vorname'].str.startswith(vorname) & kontaktdaten['nachname'].str.startswith(nachname)),
+                    "vertrag_im"
+                ]
+                # Check if any match has 'FB' (Fachbereich)
+                vertrag_in_fachbereich = (vertrag_matches == 'FB').any() if len(vertrag_matches) > 0 else False
                 if vertrag_in_fachbereich:
                     errors.append("Vertrag im Fachbereich, Meldung wird nicht erstellt.")
                 if not has_last:

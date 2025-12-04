@@ -43,13 +43,9 @@ field_tools/
 
 # Version file
 update_config.py
-
+version.json
 
 # building
 /deploy/
-keystore/
-# tuf_repo/  <-- Un-commented to allow hosting updates on GitHub Pages
-.tufup-repo-config
-deploy/
 keystore/
 /updates/launcher.log

@@ -1,6 +1,9 @@
 # Optional creation date override (DD.MM.YYYY)
 creation_date = None
 
+# Default limit for rows to process
+limit_rows = 15
+
 # --- Load overrides from persisted app settings (if present) ---
 # This lets the backend pick up values saved by the GUI without modifying code elsewhere.
 import os
@@ -32,6 +35,14 @@ def _apply_settings(settings: Dict[str, Any]):
                      v = v.strip()
               return v if v not in (None, "") else None
 
+       def _intval(key: str):
+              v = settings.get(key)
+              if isinstance(v, int):
+                     return v
+              if isinstance(v, str) and v.strip().isdigit():
+                     return int(v.strip())
+              return None
+
        # Direct mappings from settings keys to config variable names
        direct_map = {
               # current keys
@@ -44,7 +55,6 @@ def _apply_settings(settings: Dict[str, Any]):
               "gesund_path": "vorlage_gesundmeldung_path",
               "au_folder": "au_files_path",
               "export_folder": "export_path",
-              "limit_rows": "limit_rows",
               "creation_date": "creation_date",
        }
 
@@ -52,6 +62,11 @@ def _apply_settings(settings: Dict[str, Any]):
               val = _strval(s_key)
               if val:
                      globals()[cfg_name] = val
+
+       # Handle limit_rows as integer
+       limit_val = _intval("limit_rows")
+       if limit_val is not None:
+              globals()["limit_rows"] = limit_val
 
        # Legacy keys compatibility (from early UI versions)
        excel_path = _strval("excel_path")
