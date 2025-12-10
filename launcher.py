@@ -39,6 +39,61 @@ if sys.platform == "win32":
 import tkinter as tk
 from tkinter import font as tkfont
 
+# ============================================================================
+# PyInstaller Cleanup Warning Suppression
+# ============================================================================
+# When running as a PyInstaller one-file executable, a temporary directory
+# (_MEIxxxxxx) is created. On exit, PyInstaller tries to remove it but sometimes
+# files are still locked (antivirus, timing, etc.), causing a warning dialog.
+# This patch suppresses that warning since the temp files will be cleaned up
+# by Windows automatically.
+# ============================================================================
+def _patch_pyinstaller_cleanup():
+    """Patch PyInstaller's cleanup to suppress 'Failed to remove temporary directory' warning."""
+    try:
+        import atexit
+        import shutil
+        
+        # Check if running as a PyInstaller bundle
+        if not getattr(sys, 'frozen', False):
+            return
+        
+        # Get the MEI temp directory path
+        mei_dir = getattr(sys, '_MEIPASS', None)
+        if not mei_dir:
+            return
+        
+        # Store original shutil.rmtree
+        original_rmtree = shutil.rmtree
+        
+        def silent_rmtree(path, ignore_errors=False, onerror=None):
+            """Wrapper that silently ignores errors for MEI temp directories."""
+            try:
+                # If this is a PyInstaller temp directory, suppress errors
+                if '_MEI' in str(path):
+                    original_rmtree(path, ignore_errors=True)
+                else:
+                    original_rmtree(path, ignore_errors=ignore_errors, onerror=onerror)
+            except Exception:
+                pass  # Silently ignore all cleanup errors
+        
+        # Replace shutil.rmtree with our silent version
+        shutil.rmtree = silent_rmtree
+        
+        # Also patch the bootloader's cleanup function if accessible
+        try:
+            # PyInstaller uses _pyi_splash or similar for cleanup
+            import _pyi_splash
+            _pyi_splash._on_cleanup = lambda: None
+        except ImportError:
+            pass
+            
+    except Exception:
+        pass  # If patching fails, continue normally
+
+# Apply the patch immediately
+_patch_pyinstaller_cleanup()
+
 # Configure logging (to file only, no console)
 logging.basicConfig(
     filename='launcher.log',
@@ -780,7 +835,7 @@ def main_startup():
     
     splash.run()
     
-    sys.exit(0)
+    os._exit(0)  # Use os._exit to skip atexit handlers and prevent PyInstaller cleanup warning
 
 
 def install_update():
@@ -796,7 +851,7 @@ def install_update():
     
     splash.run()
     
-    sys.exit(0)
+    os._exit(0)  # Use os._exit to skip atexit handlers and prevent PyInstaller cleanup warning
 
 
 def main():
